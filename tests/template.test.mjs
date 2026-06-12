@@ -7,3 +7,9 @@ test("chart script guards empty weight data and signals readiness", () => {
   assert.match(src, /wtData\.length\s*\?\s*Math\.ceil/);
   assert.match(src, /window\.__chartsReady = true/);
 });
+
+test("attestation block embeds signature image and typed name", () => {
+  const src = bundleSource();
+  assert.match(src, /data:image\/jpeg;base64,/);
+  assert.match(src, /Geffrey Klein, MD FACOG/);
+});
