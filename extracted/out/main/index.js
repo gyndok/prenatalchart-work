@@ -150,6 +150,11 @@ function getPatientsDir() {
   }
   return dir;
 }
+function resolvePatientFile(filename) {
+  const safe = path.basename(String(filename || ""));
+  if (!safe.endsWith(".json")) throw new Error("Invalid patient filename");
+  return path.join(getPatientsDir(), safe);
+}
 async function waitForChartsReady(win, timeoutMs = 5e3) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -169,22 +174,26 @@ function setupIPC() {
   electron.ipcMain.handle("load-patients", async () => {
     const dir = getPatientsDir();
     const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json"));
-    return files.map((filename) => {
-      const filePath = path.join(dir, filename);
-      const raw = fs.readFileSync(filePath, "utf-8");
-      const data = JSON.parse(raw);
-      return {
-        filename,
-        lastName: data.lastName || "",
-        firstName: data.firstName || "",
-        mrn: data.mrn || "",
-        dob: data.dob || ""
-      };
-    });
+    const patients = [];
+    for (const filename of files) {
+      try {
+        const raw = fs.readFileSync(path.join(dir, filename), "utf-8");
+        const data = JSON.parse(raw);
+        patients.push({
+          filename,
+          lastName: data.lastName || "",
+          firstName: data.firstName || "",
+          mrn: data.mrn || "",
+          dob: data.dob || ""
+        });
+      } catch (err) {
+        console.error(`Skipping unreadable patient file ${filename}:`, err);
+      }
+    }
+    return patients;
   });
   electron.ipcMain.handle("load-patient", async (_event, filename) => {
-    const dir = getPatientsDir();
-    const filePath = path.join(dir, filename);
+    const filePath = resolvePatientFile(filename);
     const raw = fs.readFileSync(filePath, "utf-8");
     return JSON.parse(raw);
   });
@@ -206,9 +215,10 @@ function setupIPC() {
     }
     return { success: true, filename };
   });
-  electron.ipcMain.handle("delete-patient", async (_event, filename) => {
-    const filePath = path.join(getPatientsDir(), filename);
-    const { response } = await electron.dialog.showMessageBox({
+  electron.ipcMain.handle("delete-patient", async (event, filename) => {
+    const filePath = resolvePatientFile(filename);
+    const win = electron.BrowserWindow.fromWebContents(event.sender);
+    const { response } = await electron.dialog.showMessageBox(win, {
       type: "warning",
       buttons: ["Delete", "Cancel"],
       defaultId: 1,
