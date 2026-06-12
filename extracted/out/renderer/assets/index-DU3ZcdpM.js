@@ -7122,11 +7122,8 @@ function calcTpwg(visits, prePregnancyWeight) {
 function calcObstetric(data) {
   const priorPregs = data.obHistory.length;
   const g = priorPregs + 1;
-  const p2 = data.obHistory.filter(
-    (r2) => ["SVD", "NSVD", "C/S", "CS", "forceps", "vacuum"].some(
-      (t2) => r2.deliveryType.toLowerCase().includes(t2.toLowerCase())
-    )
-  ).length;
+  const deliveryRe = /\b(svd|nsvd|c\/s|cs|c-section|csection|cesarean|caesarean|vbac|forceps|vacuum|vaginal)\b/i;
+  const p2 = data.obHistory.filter((r2) => deliveryRe.test(r2.deliveryType || "")).length;
   return `G${g}P${p2}`;
 }
 function calcChartWtData(visits, prePregnancyWeight) {
