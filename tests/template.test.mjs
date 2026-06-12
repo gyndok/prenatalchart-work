@@ -13,3 +13,10 @@ test("attestation block embeds signature image and typed name", () => {
   assert.match(src, /data:image\/jpeg;base64,/);
   assert.match(src, /Geffrey Klein, MD FACOG/);
 });
+
+test("induction date is labeled Delivery Scheduled and attestation date is auto-filled", () => {
+  const src = bundleSource();
+  assert.match(src, /<label>Delivery Scheduled<\/label>/);
+  assert.doesNotMatch(src, /<label>Induction Date<\/label>/);
+  assert.match(src, /\{\{PRINTED_DATE\}\}<\/span><\/div>\s*<div style="font-size:7\.5pt; color:#555;">Date<\/div>/);
+});
