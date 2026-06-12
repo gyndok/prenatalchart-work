@@ -7147,15 +7147,16 @@ function calcChartBpData(visits) {
   }).filter((d) => d[0] > 0 && d[1] > 0 && d[2] > 0).sort((a, b) => a[0] - b[0]);
 }
 function parseHeightToInches(heightStr) {
-  const ftIn = heightStr.match(/(\d+)[''ft\s]*(\d*)[""in]?/);
+  const s = (heightStr || "").trim();
+  const cmMatch = s.match(/(\d+\.?\d*)\s*cm/i);
+  if (cmMatch) return Math.round(parseFloat(cmMatch[1]) / 2.54);
+  const ftIn = s.match(/(\d+)\s*(?:'|ft|feet)\s*(\d*)/i);
   if (ftIn) {
     const ft = parseInt(ftIn[1], 10);
     const inches = ftIn[2] ? parseInt(ftIn[2], 10) : 0;
     return ft * 12 + inches;
   }
-  const cmMatch = heightStr.match(/(\d+\.?\d*)\s*cm/);
-  if (cmMatch) return parseFloat((parseFloat(cmMatch[1]) / 2.54).toFixed(1));
-  return parseFloat(heightStr) || 0;
+  return parseFloat(s) || 0;
 }
 function esc(s) {
   return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
