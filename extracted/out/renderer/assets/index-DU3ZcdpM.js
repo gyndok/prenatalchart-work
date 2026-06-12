@@ -9339,13 +9339,14 @@ function App() {
   async function handleExportPdf() {
     try {
       setStatus("Exporting PDF...");
-      const result = await window.electronAPI.exportPdf(renderedHtml, patient.lastName);
+      const freshHtml = renderTemplate(templateHtml, patient);
+      const result = await window.electronAPI.exportPdf(freshHtml, patient.lastName);
       if (result.success) {
         setStatus(`Saved to Desktop ✓`);
       } else if (result.reason === "cancelled") {
         setStatus("");
       } else {
-        setStatus("Export failed");
+        setStatus(`Export failed${result.reason ? ": " + result.reason : ""}`);
       }
       setTimeout(() => setStatus(""), 4e3);
     } catch {
@@ -9355,7 +9356,7 @@ function App() {
   async function handlePrint() {
     try {
       setStatus("Printing...");
-      await window.electronAPI.printDocument(renderedHtml);
+      await window.electronAPI.printDocument(renderTemplate(templateHtml, patient));
       setStatus("");
     } catch {
       setStatus("Print failed");
