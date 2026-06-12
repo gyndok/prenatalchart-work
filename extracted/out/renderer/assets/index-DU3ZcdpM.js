@@ -7056,10 +7056,18 @@ function createDefaultPatient() {
     examPelvis: "Adequate"
   };
 }
-function calcAge(dob) {
-  if (!dob) return 0;
-  const birth = new Date(dob);
-  const today = /* @__PURE__ */ new Date();
+function parseLocalDate(s) {
+  if (!s) return null;
+  if (s instanceof Date) return isNaN(s.getTime()) ? null : s;
+  const m2 = String(s).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m2) return new Date(parseInt(m2[1], 10), parseInt(m2[2], 10) - 1, parseInt(m2[3], 10));
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+function calcAge(dob, refDate) {
+  const birth = parseLocalDate(dob);
+  if (!birth) return 0;
+  const today = parseLocalDate(refDate) || /* @__PURE__ */ new Date();
   let age = today.getFullYear() - birth.getFullYear();
   const m2 = today.getMonth() - birth.getMonth();
   if (m2 < 0 || m2 === 0 && today.getDate() < birth.getDate()) age--;
@@ -7069,13 +7077,13 @@ function formatDate(d) {
   return d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
 }
 function calcGaFromEdc(edcStr, refDate) {
-  if (!edcStr) return "";
-  const edc = new Date(edcStr);
-  const ref = /* @__PURE__ */ new Date();
-  if (isNaN(edc.getTime())) return "";
+  const edc = parseLocalDate(edcStr);
+  if (!edc) return "";
+  const refRaw = parseLocalDate(refDate) || /* @__PURE__ */ new Date();
+  const ref = new Date(refRaw.getFullYear(), refRaw.getMonth(), refRaw.getDate());
   const diffDays = Math.round((edc.getTime() - ref.getTime()) / (1e3 * 60 * 60 * 24));
   const gadays = 280 - diffDays;
-  if (gadays <= 0) return "Postterm";
+  if (gadays < 0) return "—";
   const weeks = Math.floor(gadays / 7);
   const days = gadays % 7;
   return `${weeks}w ${days}d`;
@@ -7098,7 +7106,7 @@ function calcBmi(weightLbs, heightIn) {
   return parseFloat((w2 / (h * h) * 703).toFixed(1));
 }
 function getBmiCategory(bmi) {
-  if (bmi <= 0) return "Normal weight";
+  if (bmi <= 0) return "—";
   if (bmi < 18.5) return "Underweight";
   if (bmi < 25) return "Normal weight";
   if (bmi < 30) return "Overweight";
@@ -7122,11 +7130,8 @@ function calcTpwg(visits, prePregnancyWeight) {
 function calcObstetric(data) {
   const priorPregs = data.obHistory.length;
   const g = priorPregs + 1;
-  const p2 = data.obHistory.filter(
-    (r2) => ["SVD", "NSVD", "C/S", "CS", "forceps", "vacuum"].some(
-      (t2) => r2.deliveryType.toLowerCase().includes(t2.toLowerCase())
-    )
-  ).length;
+  const deliveryRe = /\b(svd|nsvd|c\/s|cs|c-section|csection|cesarean|caesarean|vbac|forceps|vacuum|vaginal)\b/i;
+  const p2 = data.obHistory.filter((r2) => deliveryRe.test(r2.deliveryType || "")).length;
   return `G${g}P${p2}`;
 }
 function calcChartWtData(visits, prePregnancyWeight) {
@@ -7147,15 +7152,16 @@ function calcChartBpData(visits) {
   }).filter((d) => d[0] > 0 && d[1] > 0 && d[2] > 0).sort((a, b) => a[0] - b[0]);
 }
 function parseHeightToInches(heightStr) {
-  const ftIn = heightStr.match(/(\d+)[''ft\s]*(\d*)[""in]?/);
+  const s = (heightStr || "").trim();
+  const cmMatch = s.match(/(\d+\.?\d*)\s*cm/i);
+  if (cmMatch) return Math.round(parseFloat(cmMatch[1]) / 2.54);
+  const ftIn = s.match(/(\d+)\s*(?:'|ft|feet)\s*(\d*)/i);
   if (ftIn) {
     const ft = parseInt(ftIn[1], 10);
     const inches = ftIn[2] ? parseInt(ftIn[2], 10) : 0;
     return ft * 12 + inches;
   }
-  const cmMatch = heightStr.match(/(\d+\.?\d*)\s*cm/);
-  if (cmMatch) return parseFloat((parseFloat(cmMatch[1]) / 2.54).toFixed(1));
-  return parseFloat(heightStr) || 0;
+  return parseFloat(s) || 0;
 }
 function esc(s) {
   return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -7319,7 +7325,7 @@ function renderTemplate(templateHtml2, data) {
     HOSPITAL: esc(data.hospital),
     PEDIATRICIAN: esc(data.pediatrician),
     PROVIDER: esc(data.provider),
-    PRE_PREG_WEIGHT: data.prePregnancyWeight ? `${data.prePregnancyWeight} lbs` : "—",
+    PRE_PREG_WEIGHT: parseFloat(data.prePregnancyWeight) ? `${parseFloat(data.prePregnancyWeight)} lbs` : "—",
     OB_HISTORY_SECTION: renderObHistorySection(data.obHistory),
     MEDICAL_HISTORY: esc(data.medicalHistory),
     SURGICAL_HISTORY: esc(data.surgicalHistory),
@@ -7471,7 +7477,7 @@ function parsePatientText(text) {
   patient.hospital = get(text, /Hospital:\s*(.+?)(?:\n|$)/);
   patient.pediatrician = get(text, /Pediatrician:\s*(.+?)(?:\n|$)/);
   patient.babyName = get(text, /Baby'?s? Name:\s*(.+?)(?:\n|$)/);
-  patient.prePregnancyWeight = (get(text, /Pre-Pregnancy Wt:\s*([\d.]+)\s*lbs/) || "") + " lbs";
+  patient.prePregnancyWeight = get(text, /Pre-Pregnancy Wt:\s*([\d.]+)\s*lbs/);
   patient.height = get(text, /Ht:\s*([\d\s]+(?:ft|feet)\s*[\d]+\s*in)/) || get(text, /Height:\s*(.+?)(?:\n|$)/);
   patient.provider = "GHK";
   const btRaw = get(text, /Blood Type:\s*([A-Z][^A-Z\n]{0,10}?)\s*(?:AB Screen|Pos|Neg|\n)/) || get(text, /Blood Type:\s*(\S+(?:\s+(?:Pos|Neg|Positive|Negative))?)\s/);
@@ -7524,12 +7530,12 @@ function parsePatientText(text) {
   patient.labs.glucoseChallenge = { value: gct50, status: parseFloat(gct50) >= 140 ? "pos" : "" };
   const lateHgbM = lateSection.match(/Hgb:\s*([\d.]+)\s*Hct:\s*([\d.]+)/i);
   if (lateHgbM) patient.labs.hgb28wks = { value: `${lateHgbM[1]} / ${lateHgbM[2]}`, status: parseFloat(lateHgbM[1]) < 11 ? "pos" : "" };
-  const miscBlock = get(text, /^Misc:\s*([\s\S]+?)(?=\n\nUltrasound|\nUltrasound|\nPre-Pregnancy|\nPHYSICAL|\Z)/im);
+  const miscBlock = get(text, /^Misc:\s*([\s\S]+?)(?=\n\nUltrasound|\nUltrasound|\nPre-Pregnancy|\nPHYSICAL|(?![\s\S]))/im);
   if (miscBlock) {
     const miscText = miscBlock.split("\n").map((l2) => l2.trim()).filter(Boolean).join(" | ");
     patient.labs.antibodyScreen28 = { value: miscText, status: "" };
   }
-  const usMatches = [...text.matchAll(/(\d+\/\d+\/\d{4})\s*\(([\d.]+)\)\s*@\s*(\w+)\s+EDC:\s*([\d/]+)\s*(.+?)(?=\d+\/\d+\/\d{4}\s*\(|\nPre-Pregnancy|\nPHYSICAL|\Z)/gis)];
+  const usMatches = [...text.matchAll(/(\d+\/\d+\/\d{4})\s*\(([\d.]+)\)\s*@\s*(\w+)\s+EDC:\s*([\d/]+)\s*(.+?)(?=\d+\/\d+\/\d{4}\s*\(|\nPre-Pregnancy|\nPHYSICAL|(?![\s\S]))/gis)];
   patient.ultrasounds = usMatches.map((m2, i) => ({
     id: `us-${i}`,
     date: toIsoDate(m2[1]),
@@ -7554,10 +7560,9 @@ function parsePatientText(text) {
     const l2 = v2.trim().toLowerCase();
     if (["n", "neg", "negative", "none", ""].includes(l2)) return "Neg";
     if (["tr", "trace"].includes(l2)) return "Tr";
-    if (l2 === "1+") return "1+";
-    if (l2 === "2+") return "2+";
+    if (/^[1-4]\+$/.test(l2)) return l2;
     if (l2 === "+") return "+";
-    return "Neg";
+    return v2.trim();
   }
   function normPres(v2) {
     const l2 = v2.trim().toLowerCase();
@@ -7587,7 +7592,7 @@ function parsePatientText(text) {
     gaUs: m2[18]
   }));
   const noteMatches = [...text.matchAll(
-    /(\d+\/\d+\/\d{4})\s+([\d.]+)\s*wks?\s+Seen by:\s*\w+\s*([\s\S]*?)(?=\d+\/\d+\/\d{4}\s+[\d.]+\s*wks?\s+Seen by:|\nPlanning:|\Z)/gi
+    /(\d+\/\d+\/\d{4})\s+([\d.]+)\s*wks?\s+Seen by:\s*\w+\s*([\s\S]*?)(?=\d+\/\d+\/\d{4}\s+[\d.]+\s*wks?\s+Seen by:|\nPlanning:|(?![\s\S]))/gi
   )];
   patient.visitNotes = noteMatches.map((m2, i) => ({
     id: `n-${i}`,
@@ -9129,11 +9134,12 @@ const templateHtml = `<!DOCTYPE html>
 
 <script>
 (function() {
+  try {
   const wtData  = {{CHART_WT_DATA}};
   const bpData  = {{CHART_BP_DATA}};
   const glomLow  = {{IOM_LOW}};
   const glomHigh = {{IOM_HIGH}};
-  const yMax = Math.ceil(Math.max(...wtData.map(d=>d[1])) + 15);
+  const yMax = wtData.length ? Math.ceil(Math.max(...wtData.map(d=>d[1])) + 15) : 45;
 
   function band(lo, hi, ga) {
     const f = ga <= 12
@@ -9268,6 +9274,8 @@ const templateHtml = `<!DOCTYPE html>
       }
     }
   });
+  } catch (e) { console.error('Chart render failed:', e); }
+  window.__chartsReady = true;
 })();
 <\/script>
 
@@ -9309,7 +9317,7 @@ function App() {
   }
   async function handleSave() {
     try {
-      const result = await window.electronAPI.savePatient(patient);
+      const result = await window.electronAPI.savePatient(patient, currentFile);
       if (result.success) {
         setCurrentFile(result.filename);
         setStatus("Saved ✓");
@@ -9334,13 +9342,14 @@ function App() {
   async function handleExportPdf() {
     try {
       setStatus("Exporting PDF...");
-      const result = await window.electronAPI.exportPdf(renderedHtml, patient.lastName);
+      const freshHtml = renderTemplate(templateHtml, patient);
+      const result = await window.electronAPI.exportPdf(freshHtml, patient.lastName);
       if (result.success) {
         setStatus(`Saved to Desktop ✓`);
       } else if (result.reason === "cancelled") {
         setStatus("");
       } else {
-        setStatus("Export failed");
+        setStatus(`Export failed${result.reason ? ": " + result.reason : ""}`);
       }
       setTimeout(() => setStatus(""), 4e3);
     } catch {
@@ -9350,7 +9359,7 @@ function App() {
   async function handlePrint() {
     try {
       setStatus("Printing...");
-      await window.electronAPI.printDocument(renderedHtml);
+      await window.electronAPI.printDocument(renderTemplate(templateHtml, patient));
       setStatus("");
     } catch {
       setStatus("Print failed");

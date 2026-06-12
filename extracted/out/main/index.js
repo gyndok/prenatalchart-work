@@ -150,41 +150,75 @@ function getPatientsDir() {
   }
   return dir;
 }
+function resolvePatientFile(filename) {
+  const safe = path.basename(String(filename || ""));
+  if (!safe.endsWith(".json")) throw new Error("Invalid patient filename");
+  return path.join(getPatientsDir(), safe);
+}
+async function waitForChartsReady(win, timeoutMs = 5e3) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const ready = await win.webContents.executeJavaScript("window.__chartsReady === true");
+      if (ready) break;
+    } catch {
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  try {
+    await win.webContents.executeJavaScript("document.fonts.ready.then(() => true)");
+  } catch {
+  }
+}
 function setupIPC() {
   electron.ipcMain.handle("load-patients", async () => {
     const dir = getPatientsDir();
     const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json"));
-    return files.map((filename) => {
-      const filePath = path.join(dir, filename);
-      const raw = fs.readFileSync(filePath, "utf-8");
-      const data = JSON.parse(raw);
-      return {
-        filename,
-        lastName: data.lastName || "",
-        firstName: data.firstName || "",
-        mrn: data.mrn || "",
-        dob: data.dob || ""
-      };
-    });
+    const patients = [];
+    for (const filename of files) {
+      try {
+        const raw = fs.readFileSync(path.join(dir, filename), "utf-8");
+        const data = JSON.parse(raw);
+        patients.push({
+          filename,
+          lastName: data.lastName || "",
+          firstName: data.firstName || "",
+          mrn: data.mrn || "",
+          dob: data.dob || ""
+        });
+      } catch (err) {
+        console.error(`Skipping unreadable patient file ${filename}:`, err);
+      }
+    }
+    return patients;
   });
   electron.ipcMain.handle("load-patient", async (_event, filename) => {
-    const dir = getPatientsDir();
-    const filePath = path.join(dir, filename);
+    const filePath = resolvePatientFile(filename);
     const raw = fs.readFileSync(filePath, "utf-8");
     return JSON.parse(raw);
   });
-  electron.ipcMain.handle("save-patient", async (_event, data) => {
+  electron.ipcMain.handle("save-patient", async (_event, data, previousFilename) => {
     const dir = getPatientsDir();
     const lastName = (data.lastName || "Unknown").toLowerCase().replace(/[^a-z0-9]/g, "");
     const mrn = (data.mrn || "0000").replace(/[^a-z0-9]/gi, "");
-    const filename = `${lastName}-${mrn}.json`;
+    const filename = `${lastName || "unknown"}-${mrn || "0000"}.json`;
     const filePath = path.join(dir, filename);
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    if (previousFilename && previousFilename !== filename) {
+      const prevPath = path.join(dir, path.basename(String(previousFilename)));
+      if (prevPath !== filePath && fs.existsSync(prevPath)) {
+        try {
+          fs.unlinkSync(prevPath);
+        } catch {
+        }
+      }
+    }
     return { success: true, filename };
   });
-  electron.ipcMain.handle("delete-patient", async (_event, filename) => {
-    const filePath = path.join(getPatientsDir(), filename);
-    const { response } = await electron.dialog.showMessageBox({
+  electron.ipcMain.handle("delete-patient", async (event, filename) => {
+    const filePath = resolvePatientFile(filename);
+    const win = electron.BrowserWindow.fromWebContents(event.sender);
+    const { response } = await electron.dialog.showMessageBox(win, {
       type: "warning",
       buttons: ["Delete", "Cancel"],
       defaultId: 1,
@@ -200,7 +234,7 @@ function setupIPC() {
     return { success: false, reason: "cancelled" };
   });
   electron.ipcMain.handle("export-pdf", async (_event, html, lastName) => {
-    const safeName = lastName.replace(/[^a-zA-Z0-9]/g, "") || "patient";
+    const safeName = (lastName || "").replace(/[^a-zA-Z0-9]/g, "") || "patient";
     const defaultPath = path.join(os.homedir(), "Desktop", `${safeName}-prenatal-record.pdf`);
     const { filePath } = await electron.dialog.showSaveDialog({
       defaultPath,
@@ -208,7 +242,6 @@ function setupIPC() {
     });
     if (!filePath) return { success: false, reason: "cancelled" };
     const tmpPath = path.join(os.tmpdir(), `prenatal-export-${Date.now()}.html`);
-    fs.writeFileSync(tmpPath, html, "utf-8");
     const win = new electron.BrowserWindow({
       show: false,
       webPreferences: {
@@ -216,20 +249,28 @@ function setupIPC() {
         nodeIntegration: false
       }
     });
-    await win.loadFile(tmpPath);
-    await new Promise((resolve) => setTimeout(resolve, 2e3));
-    const pdfBuffer = await win.webContents.printToPDF({
-      printBackground: true,
-      pageSize: "Letter"
-    });
-    win.close();
-    fs.unlinkSync(tmpPath);
-    fs.writeFileSync(filePath, pdfBuffer);
-    return { success: true, filePath };
+    try {
+      fs.writeFileSync(tmpPath, html, "utf-8");
+      await win.loadFile(tmpPath);
+      await waitForChartsReady(win);
+      const pdfBuffer = await win.webContents.printToPDF({
+        printBackground: true,
+        pageSize: "Letter"
+      });
+      fs.writeFileSync(filePath, pdfBuffer);
+      return { success: true, filePath };
+    } catch (err) {
+      return { success: false, reason: String(err && err.message || err) };
+    } finally {
+      win.destroy();
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch {
+      }
+    }
   });
   electron.ipcMain.handle("print-document", async (_event, html) => {
     const tmpPath = path.join(os.tmpdir(), `prenatal-print-${Date.now()}.html`);
-    fs.writeFileSync(tmpPath, html, "utf-8");
     const win = new electron.BrowserWindow({
       show: false,
       webPreferences: {
@@ -237,15 +278,22 @@ function setupIPC() {
         nodeIntegration: false
       }
     });
-    await win.loadFile(tmpPath);
-    await new Promise((resolve) => setTimeout(resolve, 2e3));
-    win.webContents.print(
-      { printBackground: true, silent: false },
-      (_success, _failureReason) => {
-        win.close();
+    try {
+      fs.writeFileSync(tmpPath, html, "utf-8");
+      await win.loadFile(tmpPath);
+      await waitForChartsReady(win);
+      await new Promise((resolve) => {
+        win.webContents.print({ printBackground: true, silent: false }, () => resolve());
+      });
+      return { success: true };
+    } catch (err) {
+      return { success: false, reason: String(err && err.message || err) };
+    } finally {
+      win.destroy();
+      try {
         fs.unlinkSync(tmpPath);
+      } catch {
       }
-    );
-    return { success: true };
+    }
   });
 }
