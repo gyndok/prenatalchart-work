@@ -49,3 +49,10 @@ test("calcAge is timezone-safe and supports refDate", () => {
   assert.equal(calcAge("1990-06-13", "2026-06-12"), 35); // birthday tomorrow
   assert.equal(calcAge(""), 0);
 });
+
+test("getBmiCategory shows dash when BMI unknown", () => {
+  const { getBmiCategory } = extractFunctions("getBmiCategory");
+  assert.equal(getBmiCategory(0), "—");
+  assert.equal(getBmiCategory(22), "Normal weight");
+  assert.equal(getBmiCategory(31), "Obese");
+});

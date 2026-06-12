@@ -7106,7 +7106,7 @@ function calcBmi(weightLbs, heightIn) {
   return parseFloat((w2 / (h * h) * 703).toFixed(1));
 }
 function getBmiCategory(bmi) {
-  if (bmi <= 0) return "Normal weight";
+  if (bmi <= 0) return "—";
   if (bmi < 18.5) return "Underweight";
   if (bmi < 25) return "Normal weight";
   if (bmi < 30) return "Overweight";
