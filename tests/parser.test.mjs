@@ -21,3 +21,11 @@ test("negative and trace proteinuria still normalize", () => {
   assert.equal(parsePatientText(flowLine("neg")).visits[0].protein, "Neg");
   assert.equal(parsePatientText(flowLine("trace")).visits[0].protein, "Tr");
 });
+
+test("pre-pregnancy weight stored as bare number, empty when missing", () => {
+  const { parsePatientText } = parserFns();
+  const withWt = parsePatientText("Pre-Pregnancy Wt: 150 lbs");
+  assert.equal(withWt.prePregnancyWeight, "150");
+  const without = parsePatientText("Name: Jane Doe");
+  assert.equal(without.prePregnancyWeight, "");
+});

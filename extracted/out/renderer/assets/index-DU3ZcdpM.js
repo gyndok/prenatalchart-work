@@ -7325,7 +7325,7 @@ function renderTemplate(templateHtml2, data) {
     HOSPITAL: esc(data.hospital),
     PEDIATRICIAN: esc(data.pediatrician),
     PROVIDER: esc(data.provider),
-    PRE_PREG_WEIGHT: data.prePregnancyWeight ? `${data.prePregnancyWeight} lbs` : "—",
+    PRE_PREG_WEIGHT: parseFloat(data.prePregnancyWeight) ? `${parseFloat(data.prePregnancyWeight)} lbs` : "—",
     OB_HISTORY_SECTION: renderObHistorySection(data.obHistory),
     MEDICAL_HISTORY: esc(data.medicalHistory),
     SURGICAL_HISTORY: esc(data.surgicalHistory),
@@ -7477,7 +7477,7 @@ function parsePatientText(text) {
   patient.hospital = get(text, /Hospital:\s*(.+?)(?:\n|$)/);
   patient.pediatrician = get(text, /Pediatrician:\s*(.+?)(?:\n|$)/);
   patient.babyName = get(text, /Baby'?s? Name:\s*(.+?)(?:\n|$)/);
-  patient.prePregnancyWeight = (get(text, /Pre-Pregnancy Wt:\s*([\d.]+)\s*lbs/) || "") + " lbs";
+  patient.prePregnancyWeight = get(text, /Pre-Pregnancy Wt:\s*([\d.]+)\s*lbs/);
   patient.height = get(text, /Ht:\s*([\d\s]+(?:ft|feet)\s*[\d]+\s*in)/) || get(text, /Height:\s*(.+?)(?:\n|$)/);
   patient.provider = "GHK";
   const btRaw = get(text, /Blood Type:\s*([A-Z][^A-Z\n]{0,10}?)\s*(?:AB Screen|Pos|Neg|\n)/) || get(text, /Blood Type:\s*(\S+(?:\s+(?:Pos|Neg|Positive|Negative))?)\s/);
