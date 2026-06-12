@@ -39,6 +39,13 @@ Rebuild bundle:
 npx @electron/asar pack extracted app-patched.asar
 ```
 
+Install into the app (quits PrenatalChart, backs up the current asar to
+`../prenatalchart-backups/`, swaps in `app-patched.asar`, relaunches):
+
+```bash
+bash install.command   # or double-click install.command in Finder
+```
+
 Local safety backups:
 
 - `../prenatalchart-backups/patients-backup-2026-03-18-1833.tgz`
