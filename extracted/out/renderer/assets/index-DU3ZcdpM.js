@@ -7056,10 +7056,18 @@ function createDefaultPatient() {
     examPelvis: "Adequate"
   };
 }
-function calcAge(dob) {
-  if (!dob) return 0;
-  const birth = new Date(dob);
-  const today = /* @__PURE__ */ new Date();
+function parseLocalDate(s) {
+  if (!s) return null;
+  if (s instanceof Date) return isNaN(s.getTime()) ? null : s;
+  const m2 = String(s).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m2) return new Date(parseInt(m2[1], 10), parseInt(m2[2], 10) - 1, parseInt(m2[3], 10));
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+function calcAge(dob, refDate) {
+  const birth = parseLocalDate(dob);
+  if (!birth) return 0;
+  const today = parseLocalDate(refDate) || /* @__PURE__ */ new Date();
   let age = today.getFullYear() - birth.getFullYear();
   const m2 = today.getMonth() - birth.getMonth();
   if (m2 < 0 || m2 === 0 && today.getDate() < birth.getDate()) age--;
@@ -7069,13 +7077,13 @@ function formatDate(d) {
   return d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
 }
 function calcGaFromEdc(edcStr, refDate) {
-  if (!edcStr) return "";
-  const edc = new Date(edcStr);
-  const ref = /* @__PURE__ */ new Date();
-  if (isNaN(edc.getTime())) return "";
+  const edc = parseLocalDate(edcStr);
+  if (!edc) return "";
+  const refRaw = parseLocalDate(refDate) || /* @__PURE__ */ new Date();
+  const ref = new Date(refRaw.getFullYear(), refRaw.getMonth(), refRaw.getDate());
   const diffDays = Math.round((edc.getTime() - ref.getTime()) / (1e3 * 60 * 60 * 24));
   const gadays = 280 - diffDays;
-  if (gadays <= 0) return "Postterm";
+  if (gadays < 0) return "—";
   const weeks = Math.floor(gadays / 7);
   const days = gadays % 7;
   return `${weeks}w ${days}d`;

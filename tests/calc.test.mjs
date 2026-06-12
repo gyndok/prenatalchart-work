@@ -25,3 +25,27 @@ test("calcObstetric counts spelled-out deliveries and skips losses", () => {
   assert.equal(calcObstetric({ obHistory: [row("miscarriage D&C")] }), "G2P0");
   assert.equal(calcObstetric({ obHistory: [] }), "G1P0");
 });
+
+test("calcGaFromEdc honors refDate and computes GA", () => {
+  const { calcGaFromEdc } = extractFunctions("parseLocalDate", "calcGaFromEdc");
+  // 2026-06-12 -> 2026-09-18 is 98 days; GA = 280-98 = 182d = 26w0d
+  assert.equal(calcGaFromEdc("2026-09-18", "2026-06-12"), "26w 0d");
+  assert.equal(calcGaFromEdc("2026-09-18", "2026-06-13"), "26w 1d");
+});
+
+test("calcGaFromEdc returns dash for pre-conception EDC, not Postterm", () => {
+  const { calcGaFromEdc } = extractFunctions("parseLocalDate", "calcGaFromEdc");
+  assert.equal(calcGaFromEdc("2027-06-01", "2026-06-12"), "—");
+});
+
+test("calcGaFromEdc past EDC keeps counting weeks", () => {
+  const { calcGaFromEdc } = extractFunctions("parseLocalDate", "calcGaFromEdc");
+  assert.equal(calcGaFromEdc("2026-06-05", "2026-06-12"), "41w 0d");
+});
+
+test("calcAge is timezone-safe and supports refDate", () => {
+  const { calcAge } = extractFunctions("parseLocalDate", "calcAge");
+  assert.equal(calcAge("1990-06-12", "2026-06-12"), 36); // birthday today
+  assert.equal(calcAge("1990-06-13", "2026-06-12"), 35); // birthday tomorrow
+  assert.equal(calcAge(""), 0);
+});
