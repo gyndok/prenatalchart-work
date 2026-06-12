@@ -29,3 +29,27 @@ test("pre-pregnancy weight stored as bare number, empty when missing", () => {
   const without = parsePatientText("Name: Jane Doe");
   assert.equal(without.prePregnancyWeight, "");
 });
+
+test("Misc labs block at end of text is parsed (no \\Z bug)", () => {
+  const { parsePatientText } = parserFns();
+  const p = parsePatientText("Name: Jane Doe\nMisc: Hep B viral load undetectable\n1/15/2026 ferritin 18");
+  assert.match(p.labs.antibodyScreen28.value, /Hep B viral load/);
+});
+
+test("ultrasound at end of text is parsed", () => {
+  const { parsePatientText } = parserFns();
+  const p = parsePatientText(
+    "Ultrasound Data:\n5/01/2026 (12.3) @ WSCL EDC: 11/15/2026 Normal anatomy, posterior placenta"
+  );
+  assert.equal(p.ultrasounds.length, 1);
+  assert.match(p.ultrasounds[0].findings, /Normal anatomy/);
+});
+
+test("last visit note at end of text is parsed", () => {
+  const { parsePatientText } = parserFns();
+  const p = parsePatientText(
+    "5/01/2026 12.3 wks Seen by: GHK\nRoutine visit, no complaints.\n5/15/2026 14.3 wks Seen by: GHK\nFundal height appropriate."
+  );
+  assert.equal(p.visitNotes.length, 2);
+  assert.match(p.visitNotes[1].note, /Fundal height/);
+});

@@ -7530,12 +7530,12 @@ function parsePatientText(text) {
   patient.labs.glucoseChallenge = { value: gct50, status: parseFloat(gct50) >= 140 ? "pos" : "" };
   const lateHgbM = lateSection.match(/Hgb:\s*([\d.]+)\s*Hct:\s*([\d.]+)/i);
   if (lateHgbM) patient.labs.hgb28wks = { value: `${lateHgbM[1]} / ${lateHgbM[2]}`, status: parseFloat(lateHgbM[1]) < 11 ? "pos" : "" };
-  const miscBlock = get(text, /^Misc:\s*([\s\S]+?)(?=\n\nUltrasound|\nUltrasound|\nPre-Pregnancy|\nPHYSICAL|\Z)/im);
+  const miscBlock = get(text, /^Misc:\s*([\s\S]+?)(?=\n\nUltrasound|\nUltrasound|\nPre-Pregnancy|\nPHYSICAL|(?![\s\S]))/im);
   if (miscBlock) {
     const miscText = miscBlock.split("\n").map((l2) => l2.trim()).filter(Boolean).join(" | ");
     patient.labs.antibodyScreen28 = { value: miscText, status: "" };
   }
-  const usMatches = [...text.matchAll(/(\d+\/\d+\/\d{4})\s*\(([\d.]+)\)\s*@\s*(\w+)\s+EDC:\s*([\d/]+)\s*(.+?)(?=\d+\/\d+\/\d{4}\s*\(|\nPre-Pregnancy|\nPHYSICAL|\Z)/gis)];
+  const usMatches = [...text.matchAll(/(\d+\/\d+\/\d{4})\s*\(([\d.]+)\)\s*@\s*(\w+)\s+EDC:\s*([\d/]+)\s*(.+?)(?=\d+\/\d+\/\d{4}\s*\(|\nPre-Pregnancy|\nPHYSICAL|(?![\s\S]))/gis)];
   patient.ultrasounds = usMatches.map((m2, i) => ({
     id: `us-${i}`,
     date: toIsoDate(m2[1]),
@@ -7592,7 +7592,7 @@ function parsePatientText(text) {
     gaUs: m2[18]
   }));
   const noteMatches = [...text.matchAll(
-    /(\d+\/\d+\/\d{4})\s+([\d.]+)\s*wks?\s+Seen by:\s*\w+\s*([\s\S]*?)(?=\d+\/\d+\/\d{4}\s+[\d.]+\s*wks?\s+Seen by:|\nPlanning:|\Z)/gi
+    /(\d+\/\d+\/\d{4})\s+([\d.]+)\s*wks?\s+Seen by:\s*\w+\s*([\s\S]*?)(?=\d+\/\d+\/\d{4}\s+[\d.]+\s*wks?\s+Seen by:|\nPlanning:|(?![\s\S]))/gi
   )];
   patient.visitNotes = noteMatches.map((m2, i) => ({
     id: `n-${i}`,
