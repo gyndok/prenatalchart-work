@@ -150,6 +150,21 @@ function getPatientsDir() {
   }
   return dir;
 }
+async function waitForChartsReady(win, timeoutMs = 5e3) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const ready = await win.webContents.executeJavaScript("window.__chartsReady === true");
+      if (ready) break;
+    } catch {
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  try {
+    await win.webContents.executeJavaScript("document.fonts.ready.then(() => true)");
+  } catch {
+  }
+}
 function setupIPC() {
   electron.ipcMain.handle("load-patients", async () => {
     const dir = getPatientsDir();
@@ -200,7 +215,7 @@ function setupIPC() {
     return { success: false, reason: "cancelled" };
   });
   electron.ipcMain.handle("export-pdf", async (_event, html, lastName) => {
-    const safeName = lastName.replace(/[^a-zA-Z0-9]/g, "") || "patient";
+    const safeName = (lastName || "").replace(/[^a-zA-Z0-9]/g, "") || "patient";
     const defaultPath = path.join(os.homedir(), "Desktop", `${safeName}-prenatal-record.pdf`);
     const { filePath } = await electron.dialog.showSaveDialog({
       defaultPath,
@@ -208,7 +223,6 @@ function setupIPC() {
     });
     if (!filePath) return { success: false, reason: "cancelled" };
     const tmpPath = path.join(os.tmpdir(), `prenatal-export-${Date.now()}.html`);
-    fs.writeFileSync(tmpPath, html, "utf-8");
     const win = new electron.BrowserWindow({
       show: false,
       webPreferences: {
@@ -216,20 +230,28 @@ function setupIPC() {
         nodeIntegration: false
       }
     });
-    await win.loadFile(tmpPath);
-    await new Promise((resolve) => setTimeout(resolve, 2e3));
-    const pdfBuffer = await win.webContents.printToPDF({
-      printBackground: true,
-      pageSize: "Letter"
-    });
-    win.close();
-    fs.unlinkSync(tmpPath);
-    fs.writeFileSync(filePath, pdfBuffer);
-    return { success: true, filePath };
+    try {
+      fs.writeFileSync(tmpPath, html, "utf-8");
+      await win.loadFile(tmpPath);
+      await waitForChartsReady(win);
+      const pdfBuffer = await win.webContents.printToPDF({
+        printBackground: true,
+        pageSize: "Letter"
+      });
+      fs.writeFileSync(filePath, pdfBuffer);
+      return { success: true, filePath };
+    } catch (err) {
+      return { success: false, reason: String(err && err.message || err) };
+    } finally {
+      win.destroy();
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch {
+      }
+    }
   });
   electron.ipcMain.handle("print-document", async (_event, html) => {
     const tmpPath = path.join(os.tmpdir(), `prenatal-print-${Date.now()}.html`);
-    fs.writeFileSync(tmpPath, html, "utf-8");
     const win = new electron.BrowserWindow({
       show: false,
       webPreferences: {
@@ -237,15 +259,22 @@ function setupIPC() {
         nodeIntegration: false
       }
     });
-    await win.loadFile(tmpPath);
-    await new Promise((resolve) => setTimeout(resolve, 2e3));
-    win.webContents.print(
-      { printBackground: true, silent: false },
-      (_success, _failureReason) => {
-        win.close();
+    try {
+      fs.writeFileSync(tmpPath, html, "utf-8");
+      await win.loadFile(tmpPath);
+      await waitForChartsReady(win);
+      await new Promise((resolve) => {
+        win.webContents.print({ printBackground: true, silent: false }, () => resolve());
+      });
+      return { success: true };
+    } catch (err) {
+      return { success: false, reason: String(err && err.message || err) };
+    } finally {
+      win.destroy();
+      try {
         fs.unlinkSync(tmpPath);
+      } catch {
       }
-    );
-    return { success: true };
+    }
   });
 }
