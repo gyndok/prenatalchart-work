@@ -9317,7 +9317,7 @@ function App() {
   }
   async function handleSave() {
     try {
-      const result = await window.electronAPI.savePatient(patient);
+      const result = await window.electronAPI.savePatient(patient, currentFile);
       if (result.success) {
         setCurrentFile(result.filename);
         setStatus("Saved ✓");

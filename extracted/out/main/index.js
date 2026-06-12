@@ -188,13 +188,22 @@ function setupIPC() {
     const raw = fs.readFileSync(filePath, "utf-8");
     return JSON.parse(raw);
   });
-  electron.ipcMain.handle("save-patient", async (_event, data) => {
+  electron.ipcMain.handle("save-patient", async (_event, data, previousFilename) => {
     const dir = getPatientsDir();
     const lastName = (data.lastName || "Unknown").toLowerCase().replace(/[^a-z0-9]/g, "");
     const mrn = (data.mrn || "0000").replace(/[^a-z0-9]/gi, "");
-    const filename = `${lastName}-${mrn}.json`;
+    const filename = `${lastName || "unknown"}-${mrn || "0000"}.json`;
     const filePath = path.join(dir, filename);
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    if (previousFilename && previousFilename !== filename) {
+      const prevPath = path.join(dir, path.basename(String(previousFilename)));
+      if (prevPath !== filePath && fs.existsSync(prevPath)) {
+        try {
+          fs.unlinkSync(prevPath);
+        } catch {
+        }
+      }
+    }
     return { success: true, filename };
   });
   electron.ipcMain.handle("delete-patient", async (_event, filename) => {
