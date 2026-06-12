@@ -7554,10 +7554,9 @@ function parsePatientText(text) {
     const l2 = v2.trim().toLowerCase();
     if (["n", "neg", "negative", "none", ""].includes(l2)) return "Neg";
     if (["tr", "trace"].includes(l2)) return "Tr";
-    if (l2 === "1+") return "1+";
-    if (l2 === "2+") return "2+";
+    if (/^[1-4]\+$/.test(l2)) return l2;
     if (l2 === "+") return "+";
-    return "Neg";
+    return v2.trim();
   }
   function normPres(v2) {
     const l2 = v2.trim().toLowerCase();
