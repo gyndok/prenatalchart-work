@@ -20,6 +20,14 @@ What changed:
 - reduced rigid PDF pagination by merging notes, attestation, and chart content
 - enlarged and rebalanced page 1 and page 2 to use more of each sheet
 - kept major sections from splitting across pages
+- 2026-06-12 bug-fix pass: urine-dip 3+/4+ preserved; height parser (plain inches/cm);
+  parity recognizes spelled-out delivery types; timezone-safe GA/age; removed inverted
+  "Postterm" label; BMI category dash when unknown; pre-pregnancy weight double-unit;
+  end-of-text parser sections (\Z regex bug); export/print use current state; charts
+  signal readiness (no fixed 2s wait) and survive empty data; temp PHI file cleanup on
+  failure; patient rename no longer duplicates files; corrupt patient JSON skipped;
+  IPC filename traversal guard; delete dialog parented. Tests in `tests/` (run with
+  `node --test tests/*.test.mjs`).
 
 Installed app target:
 
