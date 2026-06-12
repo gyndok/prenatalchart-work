@@ -9134,11 +9134,12 @@ const templateHtml = `<!DOCTYPE html>
 
 <script>
 (function() {
+  try {
   const wtData  = {{CHART_WT_DATA}};
   const bpData  = {{CHART_BP_DATA}};
   const glomLow  = {{IOM_LOW}};
   const glomHigh = {{IOM_HIGH}};
-  const yMax = Math.ceil(Math.max(...wtData.map(d=>d[1])) + 15);
+  const yMax = wtData.length ? Math.ceil(Math.max(...wtData.map(d=>d[1])) + 15) : 45;
 
   function band(lo, hi, ga) {
     const f = ga <= 12
@@ -9273,6 +9274,8 @@ const templateHtml = `<!DOCTYPE html>
       }
     }
   });
+  } catch (e) { console.error('Chart render failed:', e); }
+  window.__chartsReady = true;
 })();
 <\/script>
 
