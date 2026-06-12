@@ -7809,7 +7809,7 @@ function PregnancyDatesTab({ data, update }) {
           onChange: (e) => update({ firstUsGa: e.target.value })
         }
       ) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx(Field$3, { label: "Induction Date (if planned)", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Field$3, { label: "Delivery Scheduled (if planned)", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
         "input",
         {
           type: "date",
@@ -8884,7 +8884,7 @@ const templateHtml = `<!DOCTYPE html>
         <div class="field"><label>Positive Preg Test</label><div class="val">{{POS_PREG_DATE}}</div></div>
         <div class="field"><label>First US</label><div class="val">{{FIRST_US_DATE}}</div></div>
         <div class="field"><label>GA at First US</label><div class="val">{{FIRST_US_GA}}</div></div>
-        <div class="field accent"><label>Induction Date</label><div class="val">{{INDUCTION_DATE}}</div></div>
+        <div class="field accent"><label>Delivery Scheduled</label><div class="val">{{INDUCTION_DATE}}</div></div>
       </div>
     </div>
   </div>
@@ -9093,7 +9093,7 @@ const templateHtml = `<!DOCTYPE html>
           <div style="font-size:7.5pt; color:#555;">Geffrey Klein, MD FACOG</div>
         </div>
         <div>
-          <div style="border-bottom: 1.5px solid #1a1a2e; margin-bottom:3px; height:28px;"></div>
+          <div style="border-bottom: 1.5px solid #1a1a2e; margin-bottom:3px; height:28px; display:flex; align-items:flex-end;"><span style="font-size:9pt; color:#1a1a2e; padding-bottom:2px;">{{PRINTED_DATE}}</span></div>
           <div style="font-size:7.5pt; color:#555;">Date</div>
         </div>
         <div style="font-size:8pt; color:#444; background:#f0f4ff; padding:8px 10px; border-radius:5px; border:1px solid #c7d2f5;">
